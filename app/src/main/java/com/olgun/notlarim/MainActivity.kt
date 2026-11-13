@@ -46,9 +46,7 @@ class MainActivity:Activity(){
  private var exportBytes=ByteArray(0)
  private var exportType="text/plain"
  private var exportName="Notlar.txt"
- private val saveLauncher=registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("*/*")){uri:Uri?->
-  if(uri!=null)try{contentResolver.openOutputStream(uri)?.use{it.write(exportBytes)};Toast.makeText(this,"Kaydedildi",Toast.LENGTH_SHORT).show()}catch(e:Exception){Toast.makeText(this,"Kaydedilemedi: ${e.message}",Toast.LENGTH_LONG).show()}
- }
+ override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){super.onActivityResult(requestCode,resultCode,data);if(requestCode==42 && resultCode==RESULT_OK){val uri=data?.data?:return;try{contentResolver.openOutputStream(uri)?.use{it.write(exportBytes)};Toast.makeText(this,"Kaydedildi",Toast.LENGTH_SHORT).show()}catch(e:Exception){Toast.makeText(this,"Kaydedilemedi: ${e.message}",Toast.LENGTH_LONG).show()}}}
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);notes.addAll(Store.load(this));render()}
  private fun btn(text:String, action:()->Unit):Button=Button(this).apply{this.text=text;setOnClickListener{action()}}
  private fun render(){
@@ -107,7 +105,7 @@ class MainActivity:Activity(){
    exportType=when(format){"PDF"->"application/pdf";"JPG"->"image/jpeg";else->"text/plain"}
    exportBytes=when(format){"PDF"->pdf(text);"JPG"->jpg(text);else->text.toByteArray(Charsets.UTF_8)}
    exportName=(if(items.size==1)items[0].title.take(35).ifBlank{"Not"} else "Tum_Notlar")+"."+format.lowercase()
-   saveLauncher.launch(exportName)
+   startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type=exportType;putExtra(Intent.EXTRA_TITLE,exportName)},42)
   }.show()
  }
  private fun lines(text:String,paint:Paint,maxWidth:Int):List<String>{
