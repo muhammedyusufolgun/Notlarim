@@ -51,32 +51,53 @@ class MainActivity:Activity(){
  private fun btn(text:String, action:()->Unit):Button=Button(this).apply{this.text=text;setOnClickListener{action()}}
  private fun render(){
   val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(14,12,14,8);setBackgroundColor(Color.rgb(248,250,252))}
-  val heading=TextView(this).apply{text="Notlarım";textSize=25f;setTextColor(Color.rgb(2,132,199));gravity=Gravity.CENTER;setPadding(12,12,12,12)}
+  val heading=TextView(this).apply{text="Notlarım";textSize=25f;setTextColor(Color.rgb(2,132,199));gravity=Gravity.CENTER;setPadding(12,48,12,12)}
   root.addView(heading)
   val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   bar.addView(btn("＋ Yeni Not"){edit(null)},LinearLayout.LayoutParams(0,-2,1f))
-  bar.addView(btn("Tümünü Aktar"){chooseExport(notes)},LinearLayout.LayoutParams(0,-2,1f))
+  bar.addView(btn("Dışarı Aktar"){chooseExport(notes)},LinearLayout.LayoutParams(0,-2,1f))
   root.addView(bar)
   val scroll=ScrollView(this);list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+  val signature=TextView(this).apply{text="Muhammed Yusuf OLGUN";gravity=Gravity.CENTER;textSize=12f;setTextColor(Color.DKGRAY);setPadding(4,10,4,12)}
+  root.addView(signature)
   setContentView(root);drawNotes()
  }
  private fun drawNotes(){
   list.removeAllViews()
   notes.forEachIndexed{index,n->
-   val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(12,8,12,8);setBackgroundColor(Color.WHITE)}
-   val title=TextView(this).apply{text=n.title;if(text.isBlank())text="Başlıksız";textSize=19f;setTextColor(Color.rgb(20,70,105))}
+   val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(12,12,12,12);setBackgroundColor(Color.WHITE)}
+   val title=TextView(this).apply{text=n.title.ifBlank{"Başlıksız"};textSize=19f;setTextColor(Color.rgb(20,70,105))}
    card.addView(title)
    card.addView(TextView(this).apply{text=n.body.take(180);maxLines=4;textSize=15f})
-   val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
+   val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;visibility=View.GONE}
    actions.addView(btn("Düzenle"){edit(n)},LinearLayout.LayoutParams(0,-2,1f))
-   actions.addView(btn("Aktar"){chooseExport(listOf(n))},LinearLayout.LayoutParams(0,-2,1f))
    actions.addView(btn("Sil"){delete(n)},LinearLayout.LayoutParams(0,-2,1f))
+   actions.addView(btn("Sırala"){card.startDragAndDrop(android.content.ClipData.newPlainText("note",n.id.toString()),View.DragShadowBuilder(card),n.id,0)},LinearLayout.LayoutParams(0,-2,1f))
    card.addView(actions)
-   val options=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-   options.addView(btn("↑"){move(index,-1)},LinearLayout.LayoutParams(0,-2,1f))
-   options.addView(btn("↓"){move(index,1)},LinearLayout.LayoutParams(0,-2,1f))
-   options.addView(btn("Widget'ta göster"){getSharedPreferences("notes",0).edit().putLong("widget",n.id).apply();NotesWidget.refresh(this);Toast.makeText(this,"Widget notu seçildi",Toast.LENGTH_SHORT).show()},LinearLayout.LayoutParams(0,-2,2f))
-   card.addView(options)
+   card.setOnLongClickListener{
+    actions.visibility=View.VISIBLE
+    card.startDragAndDrop(android.content.ClipData.newPlainText("note",n.id.toString()),View.DragShadowBuilder(card),n.id,0)
+    true
+   }
+   card.setOnDragListener{_,event->
+    when(event.action){
+     android.view.DragEvent.ACTION_DRAG_STARTED->true
+     android.view.DragEvent.ACTION_DRAG_ENTERED->{card.setBackgroundColor(Color.rgb(226,241,250));true}
+     android.view.DragEvent.ACTION_DRAG_EXITED->{card.setBackgroundColor(Color.WHITE);true}
+     android.view.DragEvent.ACTION_DROP->{
+      val fromId=event.localState as? Long
+      val from=notes.indexOfFirst{it.id==fromId}
+      val to=notes.indexOfFirst{it.id==n.id}
+      if(from>=0 && to>=0 && from!=to){
+       val item=notes.removeAt(from);notes.add(to,item);Store.save(this,notes)
+       list.post{drawNotes()}
+      };true
+     }
+     android.view.DragEvent.ACTION_DRAG_ENDED->{card.setBackgroundColor(Color.WHITE);true}
+     else->true
+    }
+   }
+   card.setOnClickListener{if(actions.visibility==View.VISIBLE)actions.visibility=View.GONE else edit(n)}
    list.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=10})
   }
  }
