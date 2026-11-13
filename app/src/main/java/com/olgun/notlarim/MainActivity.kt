@@ -27,15 +27,30 @@ object Store {
 }
 class NotesWidget:AppWidgetProvider(){
  override fun onUpdate(c:Context,m:AppWidgetManager,ids:IntArray){ids.forEach{update(c,m,it)}}
- companion object {
-  fun refresh(c:Context){val m=AppWidgetManager.getInstance(c);val ids=m.getAppWidgetIds(ComponentName(c,NotesWidget::class.java));ids.forEach{update(c,m,it)}}
+ override fun onReceive(c:Context,intent:Intent){
+  super.onReceive(c,intent)
+  if(intent.action=="com.olgun.notlarim.NEXT"){
+   val p=c.getSharedPreferences("notes",0)
+   val count=Store.load(c).size
+   p.edit().putInt("widget_index",if(count==0)0 else (p.getInt("widget_index",0)+1)%count).apply()
+   refresh(c)
+  }
+ }
+ companion object{
+  fun refresh(c:Context){val m=AppWidgetManager.getInstance(c);m.getAppWidgetIds(ComponentName(c,NotesWidget::class.java)).forEach{update(c,m,it)}}
   fun update(c:Context,m:AppWidgetManager,id:Int){
-   val notes=Store.load(c);val summary=notes.joinToString("\n\n"){it.title.ifBlank{"Başlıksız"}+"\n"+it.body}
+   val notes=Store.load(c)
+   val p=c.getSharedPreferences("notes",0)
+   val index=if(notes.isEmpty())0 else p.getInt("widget_index",0).coerceIn(0,notes.lastIndex)
+   val n=notes.getOrNull(index)
    val v=RemoteViews(c.packageName,R.layout.widget)
    v.setTextViewText(R.id.widget_title,"Notlarım (${notes.size})")
-   v.setTextViewText(R.id.widget_body,summary.ifBlank{"Henüz not eklenmedi"})
-   val p=PendingIntent.getActivity(c,0,Intent(c,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-   v.setOnClickPendingIntent(R.id.widget_body,p);v.setOnClickPendingIntent(R.id.widget_title,p);m.updateAppWidget(id,v)
+   v.setTextViewText(R.id.widget_body,if(n==null)"Henüz not eklenmedi" else "${index+1}/${notes.size}  ${n.title.ifBlank{"Başlıksız"}}\n\n${n.body}")
+   val open=PendingIntent.getActivity(c,0,Intent(c,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+   val next=PendingIntent.getBroadcast(c,1,Intent(c,NotesWidget::class.java).setAction("com.olgun.notlarim.NEXT"),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+   v.setOnClickPendingIntent(R.id.widget_title,open)
+   v.setOnClickPendingIntent(R.id.widget_next,next)
+   m.updateAppWidget(id,v)
   }
  }
 }
