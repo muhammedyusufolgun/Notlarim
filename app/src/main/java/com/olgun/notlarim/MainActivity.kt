@@ -51,7 +51,7 @@ class MainActivity:Activity(){
  private fun btn(text:String, action:()->Unit):Button=Button(this).apply{this.text=text;setOnClickListener{action()}}
  private fun render(){
   val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(14,12,14,8);setBackgroundColor(Color.rgb(248,250,252))}
-  val heading=TextView(this).apply{text="Notlarım";textSize=25f;setTextColor(Color.rgb(2,132,199));gravity=Gravity.CENTER;padding=12}
+  val heading=TextView(this).apply{text="Notlarım";textSize=25f;setTextColor(Color.rgb(2,132,199));gravity=Gravity.CENTER;setPadding(12,12,12,12)}
   root.addView(heading)
   val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   bar.addView(btn("＋ Yeni Not"){edit(null)},LinearLayout.LayoutParams(0,-2,1f))
@@ -113,7 +113,7 @@ class MainActivity:Activity(){
   text.split("\n").forEach{paragraph->
    var current=""
    paragraph.split(" ").forEach{word->
-    val next=if(current.isEmpty())word else "$"+"current "+"$"+"word"
+    val next=if(current.isEmpty())word else current+" "+word
     if(paint.measureText(next)>maxWidth && current.isNotEmpty()){out.add(current);current=word}else current=next
    };out.add(current)
   };return out
