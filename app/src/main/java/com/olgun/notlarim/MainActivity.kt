@@ -30,11 +30,10 @@ class NotesWidget:AppWidgetProvider(){
  companion object {
   fun refresh(c:Context){val m=AppWidgetManager.getInstance(c);val ids=m.getAppWidgetIds(ComponentName(c,NotesWidget::class.java));ids.forEach{update(c,m,it)}}
   fun update(c:Context,m:AppWidgetManager,id:Int){
-   val notes=Store.load(c);val selected=c.getSharedPreferences("notes",0).getLong("widget",-1)
-   val n=notes.find{it.id==selected}?:notes.firstOrNull()
+   val notes=Store.load(c);val summary=notes.joinToString("\n\n"){it.title.ifBlank{"Başlıksız"}+"\n"+it.body.take(100)}
    val v=RemoteViews(c.packageName,R.layout.widget)
-   v.setTextViewText(R.id.widget_title,n?.title?:"Notlarım")
-   v.setTextViewText(R.id.widget_body,n?.body?:"Henüz not eklenmedi")
+   v.setTextViewText(R.id.widget_title,"Notlarım (${notes.size})")
+   v.setTextViewText(R.id.widget_body,summary.ifBlank{"Henüz not eklenmedi"})
    val p=PendingIntent.getActivity(c,0,Intent(c,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
    v.setOnClickPendingIntent(R.id.widget_body,p);m.updateAppWidget(id,v)
   }
@@ -49,13 +48,14 @@ class MainActivity:Activity(){
  override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){super.onActivityResult(requestCode,resultCode,data);if(requestCode==42 && resultCode==RESULT_OK){val uri=data?.data?:return;try{contentResolver.openOutputStream(uri)?.use{it.write(exportBytes)};Toast.makeText(this,"Kaydedildi",Toast.LENGTH_SHORT).show()}catch(e:Exception){Toast.makeText(this,"Kaydedilemedi: ${e.message}",Toast.LENGTH_LONG).show()}}}
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);notes.addAll(Store.load(this));render()}
  private fun btn(text:String, action:()->Unit):Button=Button(this).apply{this.text=text;setOnClickListener{action()}}
+ private fun colored(text:String,color:Int,action:()->Unit):Button=btn(text,action).apply{backgroundTintList=android.content.res.ColorStateList.valueOf(color);setTextColor(Color.BLACK)}
  private fun render(){
   val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(14,12,14,8);setBackgroundColor(Color.rgb(248,250,252))}
   val heading=TextView(this).apply{text="Notlarım";textSize=25f;setTextColor(Color.rgb(2,132,199));gravity=Gravity.CENTER;setPadding(12,48,12,12)}
   root.addView(heading)
   val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-  bar.addView(btn("＋ Yeni Not"){edit(null)},LinearLayout.LayoutParams(0,-2,1f))
-  bar.addView(btn("Dışarı Aktar"){chooseExport(notes)},LinearLayout.LayoutParams(0,-2,1f))
+  bar.addView(colored("＋ Yeni Not",Color.rgb(207,245,199)){edit(null)},LinearLayout.LayoutParams(0,-2,1f))
+  bar.addView(colored("Dışarı Aktar",Color.rgb(191,229,255)){chooseExport(notes)},LinearLayout.LayoutParams(0,-2,1f))
   root.addView(bar)
   val scroll=ScrollView(this);list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
   val signature=TextView(this).apply{text="Muhammed Yusuf OLGUN";gravity=Gravity.CENTER;textSize=12f;setTextColor(Color.DKGRAY);setPadding(4,10,4,12)}
@@ -70,9 +70,8 @@ class MainActivity:Activity(){
    card.addView(title)
    card.addView(TextView(this).apply{text=n.body.take(180);maxLines=4;textSize=15f})
    val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;visibility=View.GONE}
-   actions.addView(btn("Düzenle"){edit(n)},LinearLayout.LayoutParams(0,-2,1f))
-   actions.addView(btn("Sil"){delete(n)},LinearLayout.LayoutParams(0,-2,1f))
-   actions.addView(btn("Sırala"){card.startDragAndDrop(android.content.ClipData.newPlainText("note",n.id.toString()),View.DragShadowBuilder(card),n.id,0)},LinearLayout.LayoutParams(0,-2,1f))
+   actions.addView(colored("Düzenle",Color.rgb(255,224,192)){edit(n)},LinearLayout.LayoutParams(0,-2,1f))
+   actions.addView(colored("Sil",Color.rgb(255,207,207)){delete(n)},LinearLayout.LayoutParams(0,-2,1f))
    card.addView(actions)
    card.setOnLongClickListener{
     actions.visibility=View.VISIBLE
@@ -120,13 +119,34 @@ class MainActivity:Activity(){
  }
  private fun chooseExport(items:List<Note>){
   if(items.isEmpty()){Toast.makeText(this,"Not bulunamadı",Toast.LENGTH_SHORT).show();return}
-  val formats=arrayOf("PDF","TXT","JPG")
-  AlertDialog.Builder(this).setTitle("Dışa aktar").setItems(formats){_,which->
-   val format=formats[which];val text=items.joinToString("\n\n────────\n\n"){"${it.title}\n\n${it.body}"}
-   exportType=when(format){"PDF"->"application/pdf";"JPG"->"image/jpeg";else->"text/plain"}
-   exportBytes=when(format){"PDF"->pdf(text);"JPG"->jpg(text);else->text.toByteArray(Charsets.UTF_8)}
-   exportName=(if(items.size==1)items[0].title.take(35).ifBlank{"Not"} else "Tum_Notlar")+"."+format.lowercase()
-   startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type=exportType;putExtra(Intent.EXTRA_TITLE,exportName)},42)
+  AlertDialog.Builder(this).setTitle("Kaydedilecek yer").setItems(arrayOf("Telefon (Download)","Google Drive")){_,destination->
+   AlertDialog.Builder(this).setTitle("Dışa aktarma biçimi").setItems(arrayOf("PDF","TXT","JPG")){_,which->
+    val format=arrayOf("PDF","TXT","JPG")[which]
+    val content=items.joinToString("\n\n────────\n\n"){"${it.title}\n\n${it.body}"}
+    exportType=when(format){"PDF"->"application/pdf";"JPG"->"image/jpeg";else->"text/plain"}
+    exportBytes=when(format){"PDF"->pdf(content);"JPG"->jpg(content);else->content.toByteArray(Charsets.UTF_8)}
+    exportName="Tum_Notlar."+format.lowercase()
+    if(destination==0 && android.os.Build.VERSION.SDK_INT>=29){
+     try{
+      val values=android.content.ContentValues().apply{
+       put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,exportName)
+       put(android.provider.MediaStore.MediaColumns.MIME_TYPE,exportType)
+       put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,android.os.Environment.DIRECTORY_DOWNLOADS+"/")
+      }
+      val uri=contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values)
+      if(uri==null)throw IllegalStateException("Dosya oluşturulamadı")
+      contentResolver.openOutputStream(uri)?.use{it.write(exportBytes)}
+      Toast.makeText(this,"Download klasörüne kaydedildi",Toast.LENGTH_LONG).show()
+     }catch(e:Exception){Toast.makeText(this,"Kaydetme hatası: ${e.message}",Toast.LENGTH_LONG).show()}
+    }else{
+     // Android belge seçici, Drive hesabındaki hedef klasörü seçmeye izin verir.
+     startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply{
+      addCategory(Intent.CATEGORY_OPENABLE);type=exportType
+      putExtra(Intent.EXTRA_TITLE,exportName)
+      if(destination==1)Toast.makeText(this@MainActivity,"Dosya seçicide Google Drive ve hedef klasörü seçin",Toast.LENGTH_LONG).show()
+     },42)
+    }
+   }.show()
   }.show()
  }
  private fun lines(text:String,paint:Paint,maxWidth:Int):List<String>{
