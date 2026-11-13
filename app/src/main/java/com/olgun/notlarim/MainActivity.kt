@@ -78,7 +78,8 @@ class MainActivity:Activity(){
  private fun render(){
   val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(14,12,14,8);setBackgroundColor(Color.rgb(248,250,252))}
   val heading=TextView(this).apply{text="Notlarım";textSize=25f;setTextColor(Color.rgb(2,132,199));gravity=Gravity.CENTER;setPadding(12,48,12,12)}
-  heading.setOnClickListener{drawNotes()}\n  root.addView(heading)
+  heading.setOnClickListener{drawNotes()}
+  root.addView(heading)
   val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   bar.addView(colored("＋ Yeni Not",Color.rgb(207,245,199)){edit(null)},LinearLayout.LayoutParams(0,-2,1f))
   bar.addView(colored("Dışarı Aktar",Color.rgb(191,229,255)){chooseExport(notes)},LinearLayout.LayoutParams(0,-2,1f))
