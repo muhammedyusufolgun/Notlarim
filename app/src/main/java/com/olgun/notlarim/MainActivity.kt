@@ -78,13 +78,13 @@ class MainActivity:Activity(){
  private fun render(){
   val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(14,12,14,8);setBackgroundColor(Color.rgb(248,250,252))}
   val heading=TextView(this).apply{text="Notlarım";textSize=25f;setTextColor(Color.rgb(2,132,199));gravity=Gravity.CENTER;setPadding(12,48,12,12)}
-  root.addView(heading)
+  heading.setOnClickListener{drawNotes()}\n  root.addView(heading)
   val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   bar.addView(colored("＋ Yeni Not",Color.rgb(207,245,199)){edit(null)},LinearLayout.LayoutParams(0,-2,1f))
   bar.addView(colored("Dışarı Aktar",Color.rgb(191,229,255)){chooseExport(notes)},LinearLayout.LayoutParams(0,-2,1f))
   root.addView(bar)
   val scroll=ScrollView(this);list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-  val signature=TextView(this).apply{text="Muhammed Yusuf OLGUN";gravity=Gravity.CENTER;textSize=12f;setTextColor(Color.DKGRAY);setPadding(4,10,4,60)}
+  val signature=TextView(this).apply{text="Muhammed Yusuf OLGUN";gravity=Gravity.CENTER;textSize=12f;setTextColor(Color.DKGRAY);setPadding(4,10,4,100)}
   root.addView(signature)
   setContentView(root);drawNotes()
  }
@@ -94,7 +94,7 @@ class MainActivity:Activity(){
    val card=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(12,12,12,12);setBackgroundColor(Color.WHITE)}
    val title=TextView(this).apply{text=n.title.ifBlank{"Başlıksız"};textSize=19f;setTextColor(Color.rgb(20,70,105))}
    card.addView(title)
-   card.addView(TextView(this).apply{text=n.body.take(180);maxLines=4;textSize=15f})
+   card.addView(TextView(this).apply{text=n.body;textSize=15f})
    val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;visibility=View.GONE}
    actions.addView(colored("Düzenle",Color.rgb(255,224,192)){edit(n)},LinearLayout.LayoutParams(0,-2,1f))
    actions.addView(colored("Sil",Color.rgb(255,207,207)){delete(n)},LinearLayout.LayoutParams(0,-2,1f))
@@ -145,33 +145,24 @@ class MainActivity:Activity(){
  }
  private fun chooseExport(items:List<Note>){
   if(items.isEmpty()){Toast.makeText(this,"Not bulunamadı",Toast.LENGTH_SHORT).show();return}
-  if(android.os.Build.VERSION.SDK_INT<29){Toast.makeText(this,"Android 10 ve üzeri gereklidir",Toast.LENGTH_LONG).show();return}
-  val content=items.joinToString("\n────────\n"){"${it.title}\n${it.body}"}
-  val files=listOf(
-   Triple("Tum_Notlar.pdf","application/pdf",pdf(content)),
-   Triple("Tum_Notlar.txt","text/plain",content.toByteArray(Charsets.UTF_8)),
-   Triple("Tum_Notlar.jpg","image/jpeg",jpg(content))
-  )
-  var saved=0
-  files.forEach{(name,mime,bytes)->
-   try{
-    val values=android.content.ContentValues().apply{
-     put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME,name)
-     put(android.provider.MediaStore.MediaColumns.MIME_TYPE,mime)
-     put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,android.os.Environment.DIRECTORY_DOWNLOADS+"/")
+  AlertDialog.Builder(this).setTitle("Dışarı aktarma biçimi").setItems(arrayOf("PDF","TXT","JPG")){_,which->
+   val format=arrayOf("PDF","TXT","JPG")[which]
+   val content=items.joinToString("\n────────\n"){"${it.title}\n${it.body}"}
+   exportType=when(format){"PDF"->"application/pdf";"JPG"->"image/jpeg";else->"text/plain"}
+   exportBytes=when(format){"PDF"->pdf(content);"JPG"->jpg(content);else->content.toByteArray(Charsets.UTF_8)}
+   exportName="Tum_Notlar."+format.lowercase()
+   val intent=Intent(Intent.ACTION_CREATE_DOCUMENT).apply{
+    addCategory(Intent.CATEGORY_OPENABLE)
+    type=exportType
+    putExtra(Intent.EXTRA_TITLE,exportName)
+    if(android.os.Build.VERSION.SDK_INT>=26){
+     putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+      android.net.Uri.parse("content://com.android.providers.downloads.documents/root/downloads"))
     }
-    val uri=contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values)
-     ?:throw IllegalStateException("Dosya oluşturulamadı")
-    contentResolver.openOutputStream(uri)?.use{it.write(bytes)}
-     ?:throw IllegalStateException("Dosya açılamadı")
-    saved++
-   }catch(e:Exception){Toast.makeText(this,"${name}: ${e.message}",Toast.LENGTH_LONG).show()}
-  }
-  if(saved>0){
-   Toast.makeText(this,"${saved} dosya Download klasörüne kaydedildi",Toast.LENGTH_LONG).show()
-   try{startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))}
-   catch(_:Exception){Toast.makeText(this,"Dosyalar > Download klasörünü açın",Toast.LENGTH_LONG).show()}
-  }
+   }
+   Toast.makeText(this,"Download açılır. Sol menüden Google Drive hesabınızı da seçebilirsiniz.",Toast.LENGTH_LONG).show()
+   startActivityForResult(intent,42)
+  }.show()
  }
  private fun lines(text:String,paint:Paint,maxWidth:Int):List<String>{
   val out=mutableListOf<String>()
