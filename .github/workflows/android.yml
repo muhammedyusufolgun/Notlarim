@@ -11,9 +11,9 @@ jobs:
       java-version: '17'
    - name: Install Android SDK packages
      run: |
-       SDKMANAGER=$(find /usr/local/lib/android/sdk /opt/android-sdk -path '*/bin/sdkmanager' -type f 2>/dev/null | head -n 1)
+       SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+       SDKMANAGER=$(find "$SDK_ROOT" -path '*/bin/sdkmanager' -type f -print -quit)
        if [ -z "$SDKMANAGER" ]; then echo "SDK manager not found"; exit 1; fi
-       yes | "$SDKMANAGER" --licenses || true
        "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
    - uses: gradle/actions/setup-gradle@v4
      with:
