@@ -30,12 +30,12 @@ class NotesWidget:AppWidgetProvider(){
  companion object {
   fun refresh(c:Context){val m=AppWidgetManager.getInstance(c);val ids=m.getAppWidgetIds(ComponentName(c,NotesWidget::class.java));ids.forEach{update(c,m,it)}}
   fun update(c:Context,m:AppWidgetManager,id:Int){
-   val notes=Store.load(c);val summary=notes.joinToString("\n\n"){it.title.ifBlank{"Başlıksız"}+"\n"+it.body.take(100)}
+   val notes=Store.load(c);val summary=notes.joinToString("\n\n"){it.title.ifBlank{"Başlıksız"}+"\n"+it.body}
    val v=RemoteViews(c.packageName,R.layout.widget)
    v.setTextViewText(R.id.widget_title,"Notlarım (${notes.size})")
    v.setTextViewText(R.id.widget_body,summary.ifBlank{"Henüz not eklenmedi"})
    val p=PendingIntent.getActivity(c,0,Intent(c,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-   v.setOnClickPendingIntent(R.id.widget_body,p);m.updateAppWidget(id,v)
+   v.setOnClickPendingIntent(R.id.widget_body,p);v.setOnClickPendingIntent(R.id.widget_title,p);m.updateAppWidget(id,v)
   }
  }
 }
@@ -143,7 +143,7 @@ class MainActivity:Activity(){
      startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply{
       addCategory(Intent.CATEGORY_OPENABLE);type=exportType
       putExtra(Intent.EXTRA_TITLE,exportName)
-      if(destination==1)Toast.makeText(this@MainActivity,"Dosya seçicide Google Drive ve hedef klasörü seçin",Toast.LENGTH_LONG).show()
+      if(destination==1)Toast.makeText(this@MainActivity,"Sol üst menüden Drive hesabınızı seçin; Drive listelenmiyorsa uygulamayı yükleyip oturum açın",Toast.LENGTH_LONG).show()
      },42)
     }
    }.show()
